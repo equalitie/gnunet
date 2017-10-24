@@ -31,6 +31,7 @@ ltmain.sh
 lynXified.*
 missing
 po/*.gmo
+po/*.po
 pkgconfig/*.pc
 src/*/*.conf
 stamp-h1
