@@ -678,6 +678,26 @@ void
 GNUNET_SCHEDULER_run (GNUNET_SCHEDULER_TaskCallback task,
                       void *task_cls)
 {
+    GNUNET_SCHEDULER_run_with_optional_signals(GNUNET_YES, task, task_cls);
+}
+
+
+/**
+ * Initialize and run scheduler.  This function will return when all
+ * tasks have completed.  When @ install_signals is GNUNET_YES, then
+ * this function behaves in the same was as GNUNET_SCHEDULER_run does.
+ * If @ install_signals is GNUNET_NO then no signal handlers are
+ * installed.
+ *
+ * @param install_signals whether to install signals (GNUNET_YES/NO)
+ * @param task task to run first (and immediately)
+ * @param task_cls closure of @a task
+ */
+void
+GNUNET_SCHEDULER_run_with_optional_signals (int install_signals,
+                                            GNUNET_SCHEDULER_TaskCallback task,
+                                            void *task_cls)
+{
   struct GNUNET_SCHEDULER_Driver *driver;
   struct DriverContext context = {.scheduled_head = NULL,
                                   .scheduled_tail = NULL,
@@ -686,11 +706,10 @@ GNUNET_SCHEDULER_run (GNUNET_SCHEDULER_TaskCallback task,
   driver = GNUNET_SCHEDULER_driver_select ();
   driver->cls = &context;
 
-  GNUNET_SCHEDULER_run_with_driver (driver, task, task_cls);
+  GNUNET_SCHEDULER_run_with_driver (driver, install_signals, task, task_cls);
   
   GNUNET_free (driver);
 }
-
 
 /**
  * Obtain the task context, giving the reason why the current task was
@@ -2036,6 +2055,7 @@ GNUNET_SCHEDULER_run_from_driver (struct GNUNET_SCHEDULER_Handle *sh)
  */
 int
 GNUNET_SCHEDULER_run_with_driver (const struct GNUNET_SCHEDULER_Driver *driver,
+                                  int install_signals,
                                   GNUNET_SCHEDULER_TaskCallback task,
                                   void *task_cls)
 {
@@ -2066,25 +2086,28 @@ GNUNET_SCHEDULER_run_with_driver (const struct GNUNET_SCHEDULER_Driver *driver,
   my_pid = getpid ();
   scheduler_driver = driver;
 
-  /* install signal handlers */
-  LOG (GNUNET_ERROR_TYPE_DEBUG,
-       "Registering signal handlers\n");
-  shc_int = GNUNET_SIGNAL_handler_install (SIGINT,
-             &sighandler_shutdown);
-  shc_term = GNUNET_SIGNAL_handler_install (SIGTERM,
-              &sighandler_shutdown);
-#if (SIGTERM != GNUNET_TERM_SIG)
-  shc_gterm = GNUNET_SIGNAL_handler_install (GNUNET_TERM_SIG,
+  if (GNUNET_YES == install_signals)
+  {
+    /* install signal handlers */
+    LOG (GNUNET_ERROR_TYPE_DEBUG,
+         "Registering signal handlers\n");
+    shc_int = GNUNET_SIGNAL_handler_install (SIGINT,
                &sighandler_shutdown);
+    shc_term = GNUNET_SIGNAL_handler_install (SIGTERM,
+                &sighandler_shutdown);
+#if (SIGTERM != GNUNET_TERM_SIG)
+    shc_gterm = GNUNET_SIGNAL_handler_install (GNUNET_TERM_SIG,
+                 &sighandler_shutdown);
 #endif
 #ifndef MINGW
-  shc_pipe = GNUNET_SIGNAL_handler_install (SIGPIPE,
-              &sighandler_pipe);
-  shc_quit = GNUNET_SIGNAL_handler_install (SIGQUIT,
-              &sighandler_shutdown);
-  shc_hup = GNUNET_SIGNAL_handler_install (SIGHUP,
-             &sighandler_shutdown);
+    shc_pipe = GNUNET_SIGNAL_handler_install (SIGPIPE,
+                &sighandler_pipe);
+    shc_quit = GNUNET_SIGNAL_handler_install (SIGQUIT,
+                &sighandler_shutdown);
+    shc_hup = GNUNET_SIGNAL_handler_install (SIGHUP,
+               &sighandler_shutdown);
 #endif
+  }
 
   /* Setup initial tasks */
   current_priority = GNUNET_SCHEDULER_PRIORITY_DEFAULT;
@@ -2116,17 +2139,21 @@ GNUNET_SCHEDULER_run_with_driver (const struct GNUNET_SCHEDULER_Driver *driver,
   GNUNET_NETWORK_fdset_destroy (sh.rs);
   GNUNET_NETWORK_fdset_destroy (sh.ws);
 
-  /* uninstall signal handlers */
-  GNUNET_SIGNAL_handler_uninstall (shc_int);
-  GNUNET_SIGNAL_handler_uninstall (shc_term);
+  if (GNUNET_YES == install_signals)
+  {
+    /* uninstall signal handlers */
+    GNUNET_SIGNAL_handler_uninstall (shc_int);
+    GNUNET_SIGNAL_handler_uninstall (shc_term);
 #if (SIGTERM != GNUNET_TERM_SIG)
-  GNUNET_SIGNAL_handler_uninstall (shc_gterm);
+    GNUNET_SIGNAL_handler_uninstall (shc_gterm);
 #endif
 #ifndef MINGW
-  GNUNET_SIGNAL_handler_uninstall (shc_pipe);
-  GNUNET_SIGNAL_handler_uninstall (shc_quit);
-  GNUNET_SIGNAL_handler_uninstall (shc_hup);
+    GNUNET_SIGNAL_handler_uninstall (shc_pipe);
+    GNUNET_SIGNAL_handler_uninstall (shc_quit);
+    GNUNET_SIGNAL_handler_uninstall (shc_hup);
 #endif
+  }
+
   GNUNET_DISK_pipe_close (shutdown_pipe_handle);
   shutdown_pipe_handle = NULL;
   scheduler_driver = NULL;
