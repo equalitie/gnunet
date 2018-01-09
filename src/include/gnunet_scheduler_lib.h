@@ -358,6 +358,7 @@ typedef void
  */
 int
 GNUNET_SCHEDULER_run_with_driver (const struct GNUNET_SCHEDULER_Driver *driver,
+				  int install_signals,
 				  GNUNET_SCHEDULER_TaskCallback task,
 				  void *task_cls);
 
